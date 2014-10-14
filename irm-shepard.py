@@ -30,631 +30,13 @@ import logging.handlers as handlers
 logger = logging.getLogger("Rotating Log")
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S %p')
-handler = handlers.TimedRotatingFileHandler("n-irm.log",when="H",interval=24,backupCount=0)
+handler = handlers.TimedRotatingFileHandler("s-irm.log",when="H",interval=24,backupCount=0)
 ## Logging format
 handler.setFormatter(formatter)
 
 logger.addHandler(handler)
 
-def getIP(url):
-    logger.info("Called")
-    address_regexp = re.compile ('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-    try:
-        result = address_regexp.search(url)
-    except AttributeError:
-    	print "N-Irm: [getIP] Failed to get IP. result variable could not search url. Possible url fault"
-    	logger.error("url error caused result variable to have incorrect assignment")
 
-    if result:
-            return result.group()
-    else:
-            return None
-    logger.info("Completed!")
-
-#def createToken(os_api_url, tenantName, username, password):
-     #logger.info("Called")
-     #headers = {'content-type': 'application/json'}
-     #data = json.dumps({"auth": {"tenantName": tenantName, "passwordCredentials": {"username": username, "password": password}}})
-     #token_url = os_api_url+"/v2.0/tokens"
-     ##print "token_url: "+token_url
-     #r = requests.post(token_url, data, headers=headers)
-     #try:
-        #token_id = r.json()['access']['token']['id']
-     #except AttributeError:
-        #print "N-Irm: [createToken] Unable to use r variable with json. Fault with token_url, or data variables"
-        #logger.error("Fault with token_url or data variable, caused r to be unusable with json")
-     
-     #if token_id:
-            ##print token_id
-            #return token_id
-     #else:
-            #return None
-     #logger.info("Completed!")
-
-#def getEndPoint(os_api_url, token_id):
-     #logger.info("Called")
-     #endpoints_url = os_api_url+"/v2.0/tokens/"+token_id+"/endpoints"
-     #headers = {'X-Auth-Token': token_id}
-
-     #if str(token_id) not in str(headers):
-       #raise AttributeError("N-Irm: [getEndPoint] Failure to assign headers. Possibly incorrect token_id")
-       #logger.error("Failed to assign headers. Possible fault in token_id")
-
-     #r = requests.get(endpoints_url, headers=headers)
-     #try:
-       #endpoints = r.json()['endpoints']
-     #except AttributeError:
-       #print "N-Irm [getEndPoint] Failure to assign endpoints. Possibly incorrect endpoints_url or unable to acces endpoints"
-       #logger.error("Failed to assign endpoints. Possible incorrect endpoints_url or unable to access endpoints")
-    ## print endpoints
-     #for majorkey in endpoints:
-         #if majorkey['type'] == 'compute':
-            #public_url = majorkey['publicURL']
-     #if public_url:
-            #print public_url
-            #return public_url
-     #else:
-            #return None
-     #logger.info("Completed!")
-
-
-## get hosts from nova and return a list
-#def getHosts():
-     #logger.info("Called")
-	### regex check that public url begins with http:// 
-	### token id check that it is of the correct length [32]
-	### general try except in the event of an unexpected error, recommending that 
-	### they check the public url, as named urls may not have been resolved
-
-     #headers = {'X-Auth-Token': token_id}
-     ##headers = None
-     ##print public_url
-     ##print token_id
-     #r = requests.get(public_url+'/os-hosts', headers=headers)
-     
-    ## print headers
-    ## print "public url"
-     #print public_url
-    ## print "token id"
-    ## print token_id
-   
-     #if str(token_id) not in str(headers):
-       #raise AttributeError("N-Irm: [getHosts] Failure to assign headers. Possibly incorrect token_id")
-       #logger.error("Failed to assign headers. Possible fault in token_id")
-     
-     #try:
-     	#print r.json() 
-     #except ValueError:
-     	#print "N-Irm: [getHosts] r = requests.get failed. Possible error with public_url or hostname"
-     	#logger.error("Error within public_url or hostname. ")
-
-     #hosts = []
-     #for majorkey in r.json()['hosts']:
-          #if majorkey['service'] == 'compute':
-              #hosts.append(majorkey['host_name'])
-     #if hosts:
-            #return hosts
-     #else:
-            #return None
-     #logger.info("Completed!")
-
-
-
-#def getHostDetails(hostname):
-    #logger.info("Called")
-    #headers = {'X-Auth-Token': token_id}
-    ##headers = None       
-    #if str(token_id) not in str(headers):
-    	#raise AttributeError("N-Irm: [getHostDetails] Failure to assign headers. Possibly incorrect token_id")
-    	#logger.error("Failed to assign headers. Possible fault in token_id")
-
-    #r = requests.get(public_url+'/os-hosts/'+hostname, headers=headers)
-    ##print r
-    #try:
-    	#hostDetails = r.json()
-    #except ValueError:
-    	#print "N-Irm: [getHostDetails] r = requests.get failed. Possible error with public_url or hostname"
-    	#print ""
-    	#logger.error("Error within public_url or hostname")
-    ##print hostDetails    
-    
-    #if hostDetails:
-       #return hostDetails
-    #else:
-       #return None
-    #logger.info("Completed!")
-
-def createListAvailableResources(option):
-     # create response structure
-     logger.info("Called")
-     resources = {option:[]}   
-     #h_list = getHosts()
-     headers = {'content-type': 'application/json'}
-     #data = {}
-     r = requests.post('http://'+SHEPAPI+'/method/getLocalInfo', headers=headers, data=json.dumps({}))
-     localInfo = r.json()
-     print localInfo
-     r = requests.post('http://'+SHEPAPI+'/method/getAvailableResources', headers=headers, data=json.dumps({}))
-     freeInfo = r.json()
-     print freeInfo
-     ## loop through all hosts
-     #for novah in h_list:
-     for h in host_list['DFESet']:
-       #if novah == h['host_name']:
-		   #host_split = h.split()
-		   # load values
-           hostIP = localInfo['IP']
-           hostName = localInfo['host_name']
-           hostModel = h['Model']
-           #hostQuantity = h['Quantity']
-           costModel = h['Cost']['Model']
-           costQuantity = h['Cost']['Quantity']
-		   #costDisk = h['Cost']['Disk']
-		   #frequency = h['frequency']
-           location = h['location']
-           CRSID = location+hostIP+"/DFE/"+hostName
-           freeRes = freeInfo['result']
-           #print hostName,costCores,costMemory,costDisk
-           # get details from nova
-
-           #hostDetails = getHostDetails(hostName)
-           #nCores = 0
-           #Memory = 0
-           #total_cpu = 0
-           #used_cpu = 0
-           #total_mem = 0
-           #used_mem = 0
-           #total_disk = 0
-           #used_disk = 0
-						
-		 ## load detail from nova reply
-		 #if 'host' in hostDetails:
-			 #for majorkey in hostDetails['host']:
-	     #if majorkey['resource']['project'] == '(total)':
-	         #total_mem = majorkey['resource']['memory_mb'] * int(CONFIG.get('overcommit', 'MEM_RATIO'))
-	         #total_cpu = majorkey['resource']['cpu'] * int(CONFIG.get('overcommit', 'CPU_RATIO'))
-	         #total_disk = majorkey['resource']['disk_gb'] * int(CONFIG.get('overcommit', 'DISK_RATIO'))
-	     #if majorkey['resource']['project'] == '(used_now)':
-	         #used_mem = majorkey['resource']['memory_mb']
-	         #used_cpu = majorkey['resource']['cpu']
-	         #used_disk = majorkey['resource']['disk_gb']
-				 ## calculate available resources
-				 #nCores = total_cpu - used_cpu
-				 #Memory = int(total_mem - used_mem - 0.1 * total_mem)
-				 #disk = total_disk - used_disk
-			 ## build response
-           data = {"ID":CRSID, "IP":hostIP, "Type":"DFE","Attributes":{"Model":hostModel,"Quantity":freeRes},"Cost":{"Model":costModel,"Quantity":costQuantity}}
-           resources[option].append(data)
-           print resources
-     #r = json.dumps(resources)
-     #if "{'Resources': []}" in resources:
-         #raise AttributeError('N-Irm: [createListAvailableResources] resources variable is empty. Failure to append data variable')
-         #logger.error("Failed to append 'data' variable. 'Resources' variable empty")
-
-     
-     logger.info("Completed!")
-
-     if resources:
-         return resources
-     else:
-         return None
-
-
-# To be fixed with GET
-@route('/method/getAvailableResources/', method='POST')
-@route('/method/getAvailableResources', method='POST')
-def getAvailableResources(): 
-    logger.info("Called")
-
-    try:    	
-        if SHEPAPI == "":
-           raise Exception("No SHEPARD Compute has been registered!")
-           
-        option = "Resources"   
-        resources = createListAvailableResources(option) 
-        r = {"result":resources}       
-
-        result = json.dumps(r)
-        print result
-    	             
-    except Exception, msg:
-       response.status = 400
-       e = str(msg)
-       error = {"message":e,"code":response.status}
-       return error
-       logger.error(error)
-    
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD') 
-
-    logger.info("Completed")   
-    return result
-    
-
-#def createFlavor(name,vcpu,ram,disk):
-    #logger.info("Called")
-    #headers = {'content-type': 'application/json','X-Auth-Token': token_id}
-    
-    #if str(token_id) not in str(headers):
-    	#raise AttributeError("N-Irm: [createFlavor] Failure to assign headers. Possibly incorrect token_id")
-    	#logger.error("Failed to assign headers. Possible fault in token_id")
-    
-    #data = json.dumps({"flavor": {\
-        #"name": name,\
-        #"ram": ram,\
-        #"vcpus": vcpu,\
-        #"disk": disk,\
-        #"id": name}})
-
-
-        ## add here a check if that flavor name exists already and in that case return the correspondent ID
-    ## without trying to create a new one as it will fail
-    #r = requests.post(public_url+'/flavors', data, headers=headers)
-
-    ##print r.json()
-    #logger.info("Completed!")
-
-#def deleteFlavor(ID):
-    #logger.info("Called")
-    #headers = {'X-Auth-Token': token_id}
-    #if str(token_id) not in str(headers):
-    	#raise AttributeError("N-Irm: [deleteFlavor] Failure to assign headers. Possibly incorrect token_id")
-    	#logger.error("Failed to assign headers. Possible fault in token_id")
-
-    #r = requests.delete(public_url+'/flavors/'+ID, headers=headers)
-    #logger.info("Completed!")
-
-#def cleanFlavors():
-    #logger.info("Called")
-    #headers = {'X-Auth-Token': token_id}
-    #r = requests.get(public_url+'/flavors', headers=headers)
-
-    #for flavor in r.json()['flavors']:
-		#if "HARNESS" in flavor['name']:
-			#deleteFlavor(flavor['id'])
-			##print flavor
-
-    #logger.info("Completed!")
-
-def createRandomID(size):
-    import binascii
-    return binascii.b2a_hex(os.urandom(size))
-    logger.info("Random ID generated")
-
-def getInstanceStatus(ID):
-    logger.info("Called")
-    headers = {'X-Auth-Token': token_id}
-    
-    if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [getInstanceStatus] Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
-    
-    r = requests.get(public_url+'/servers/'+ID, headers=headers)
-    
-    #print r.json()['server']['id']
-    try:
-    	status = r.json()['server']['status']
-    except TypeError:
-    	print "N-Irm: [getInstanceStatus] Fault in ID. Cannot access ['server'] ['status']"
-
-    if status:
-         return status
-    else:
-         return None
-         
-    logger.info("Completed!")
-
-
-#def getNetworks():
-    #logger.info("Called")
-    #headers = {'X-Auth-Token': token_id}
-
-    #if str(token_id) not in str(headers):
-    	#raise AttributeError("N-Irm: [getNetworks]  Failure to assign headers. Possibly incorrect token_id")
-    	#logger.error("Failed to assign headers. Possible fault in token_id")
-    
-    #r = requests.get(public_url+'/os-networks', headers=headers)
-    ##print r.json()
-    #networks = []
-    #for net in r.json()['networks']:
-         #networks.append(net['label'])
-
-    #if len(networks) > 0:
-         #return networks
-    #else:
-         #return None
-    #logger.info("Completed!")
-
-# To be fixed with GET
-@route('/method/checkReservationInfo/<ID>', method='POST')
-def getInstanceInfo(ID):
-    logger.info("Called")
-    headers = {'X-Auth-Token': token_id}
-    if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [getInstanceInfo] Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
-    
-    r = requests.get(public_url+'/servers/'+ID, headers=headers)
-
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD')
-    #print r.json()
-    #print r.json()['server']['id']
-    #status = r.json()['server']['status']
-    if r:
-         return r.json()
-    else:
-         return None
-    logger.info("Completed!")
-
-
-# To be fixed with GET
-#@route('/method/verifyResources/<ID>', method='POST')
-#def verifyResources(ID):
-    ##headers = {'X-Auth-Token': token_id}
-    ##r = requests.get(public_url+'/servers/'+ID, headers=headers)
-    ##print r.json()['server']['id']
-    ##status = getInstanceStatus(ID)
-    #info = getInstanceInfo(ID)
-    #status = info['server']['status']
-    #IP = "100"
-    #for private in info['server']['addresses']['private']:
-        #if private['OS-EXT-IPS:type'] == "fixed":
-            #IP = private['addr']
-    ##status = r.json()['server']['status']
-    #response.set_header('Content-Type', 'application/json')
-    #response.set_header('Accept', '*/*')
-    #response.set_header('Allow', 'POST, HEAD')
-    #data = {"result":{"Ready":status,"addresses":IP}}
-    #if data:
-         #return data
-    #else:
-         #return None
-
-# To be fixed with GET
-@route('/method/verifyResources/', method='POST')
-@route('/method/verifyResources', method='POST')
-def verifyResources():
-    logger.info("Called")
-    try:
-        req = json.load(request.body)
-    except ValueError:
-        print "N-Irm: [verifyResources] Attempting to load a non-existent payload, please enter desired payload"   
-        print " "
-        logger.error("Payload was empty. A payload must be present")
-    reply = {"Reservations":[]}
-   
-   # print reply
-    #network = getNetworks()[0]
-    #print network
-    try:
-    	try:            
-    	    for ID in req['Reservations']:
-            	status = "false"                
-                try:
-                    while status == "false":
-                        info = getInstanceInfo(ID)
-                        osstatus = info['server']['status']
-                        #print osstatus
-                        if osstatus == "ACTIVE": status = "true"
-                except TypeError:
-                	print "N-Irm: [verifyResources] Payload present but fault in ID. Could be missing or incorrect."
-                	print " "
-                	logger.error("Fault in the payload's ID. Either missing or incorrect, must match an existent ID")
-                IP = "100"
-                # change to private to vmnet in field below
-                for private in info['server']['addresses'][CONFIG.get('network', 'NET_ID')]:
-                    if private['OS-EXT-IPS:type'] == CONFIG.get('network', 'IP_TYPE'):
-                        IP = private['addr']
-                #status = r.json()['server']['status']
-                response.set_header('Content-Type', 'application/json')
-                response.set_header('Accept', '*/*')
-                response.set_header('Allow', 'POST, HEAD')
-                data = {"ID":ID,"Ready":status,"Address":IP}
-                reply["Reservations"].append(data)
-            # When there is no ID, this case occurs    
-            if ID in req['Reservations'] is None:
-    	       raise UnboundLocalError('N-Irm: [verifyResources] Attempting to use ID variable before it has a value. Ensure payload has "<instanceID>"')
-    	       logger.error("ID has not been assigned before being used. Ensure payload has a present and correct instance ID")
-        except UnboundLocalError:
-            raise UnboundLocalError("N-Irm: [verifyResources] Attempting to reference variable before it has been assigned. Payload may be missing. Or ID is missing or empty. Please check payload!")
-            logger.error("Variable being referenced before payload or ID is assigned, possibly missing or empty. ")
-
-        
-        option = "AvailableResources"
-        resources = createListAvailableResources(host_list,public_url,token_id,option)
-        reply["Reservations"]
-        reply.update(resources)
-        result = {"result":reply}
-        jsondata = json.dumps(result)
-        return jsondata
-    
-    except Exception.message, e:
-        response.status = 400
-        error = {"message":e,"code":response.status}
-        return error
-        logger.error(error)
-    logger.info("Completed!")
-
-@route('/method/reserveResources/', method='POST')
-@route('/method/reserveResources', method='POST')
-def reserveResources():
-    logger.info("Called")
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD')
-    try:
-        # get the body request
-      #  print request.body
-        try:
-            req = json.load(request.body)
-        except ValueError:
-        	print "N-Irm [reserveResources] Attempting to load a non-existent payload please enter desired payload"
-        	logger.error("Payload was empty or incorrect. A payload must be present and correct")
-        	print " "
-
-        cleanFlavors()
-        reply = {"Reservations":[]}
-        # loop through all requested resources
-        name = ""
-        #print req
-        for resource in req['Resources']:
-           #print resource
-           # load values
-           IP = resource['IP']
-           if 'Cores' in resource['Attributes']:
-               vcpu = resource['Attributes']['Cores']
-           else:
-               vcpu = 0
-           if 'Memory' in resource['Attributes']:
-               memory = resource['Attributes']['Memory']
-           else:
-               memory = 0
-           if 'Disk' in resource['Attributes']:
-               disk = resource['Attributes']['Disk']
-           else:
-               disk = 0
-           if 'Frequency' in resource['Attributes']:
-               frequency = resource['Attributes']['Frequency']
-           else:
-               frequency = 0
-           #if resource['imageRef']:
-           image = resource['image']
-           #else:
-           #    imageRef = ''
-           print IP,vcpu,memory,disk,frequency, image
-           #count = resource['NumInstances']
-           #count = 1
-           #print "COUNT: ",count
-           # get host_name from IP in the request
-           hostName = ""
-           h_list = getHosts()
-           #print h_list
-          # print IP
-           for novah in h_list:
-               #print host_list
-               for h in host_list['Machine']:
-                   #print novah, h
-                   if novah == h['host_name']:
-                       # load values
-                       if h['IP'] == IP:
-                          hostName = h['host_name']
-                          # build host for availability_zone option to target specific host
-                          host = "nova:"+hostName
-                          name = "HARNESS-"+createRandomID(6)
-                          # create ID for flavor creation
-                          #tmpID = createRandomID(15)
-                          #print tmpID
-                          createFlavor(name,vcpu,memory,disk)
-                          headers = {'content-type': 'application/json','X-Auth-Token': token_id}
-                          # build body for nova api
-                          # create instances up to the number in the request
-                          #for i in xrange(0,count):
-                          data = json.dumps({"server" : {\
-                                      "name" : name,\
-                                      "imageRef" : image, \
-                                      #"imageRef" : "162bb278-76cf-4dd2-8560-e3367050d32a", \
-                                      #"imageRef" : "3184a7b0-673e-4c17-9243-9241c914eec8",\
-                                      #"imageRef" : "185982bc-5eab-4cde-8061-02d519dca5ef",\
-                                      "flavorRef" : name,\
-                                      "min_count": 1,\
-                                      "max_count": 1,\
-                                      "availability_zone":host}})
-                          #print "Creating instance number "+str(i+1)+", name "+name
-                          print "Creating instance "+name
-                          r = requests.post(public_url+'/servers', data, headers=headers)
-                          #print r.json()
-                          try:
-                          	ID = r.json()['server']['id']
-                          except KeyError:
-                          	print "N-Irm: [reserveResources] Error within payload, please check spelling"
-                          logger.error("KeyError in payload, please check spelling of attributes")
-                          #print getInstanceInfo(ID)
-                          #print ID
-                          #status = ""
-                                  #while (status != "ACTIVE") and (status !="ERROR"):
-                                  #    status = getInstanceStatus(ID)
-                                  #    print "Status of "+name+" "+status
-                          #instanceID = {"InfReservID":ID}
-                          try:
-                          	reply["Reservations"].append(ID)
-                          except UnboundLocalError:
-                          	print "N-Irm [reserveResources] Failed to append ID. As it has been referenced before assignment"
-              	          logger.error("Attempting to append the ID when it has not been assigned yet")
-
-                          # delete flavor
-                          deleteFlavor(name)
-        result = {"result":reply}
-        jsondata = json.dumps(result)
-        return jsondata
-
-    except Exception.message, e:
-        response.status = 400
-        if name: deleteFlavor(name)
-        error = {"message":e,"code":response.status}
-        return error
-        logger.error(error)
-
-    logger.info("Completed!")
-
-# To be fixed with DELETE
-@route('/method/releaseResources/<ID>', method='POST')
-def releaseResources(ID):
-    logger.info("Called")
-    headers = {'X-Auth-Token': token_id}
-    #print headers
-    #print token_id    
-    if str(token_id) not in str(headers):
-    	raise AttributeError("N-Irm: [releaseResources/<ID>] Failure to assign headers. Possibly incorrect token_id")
-    	logger.error("Failed to assign headers. Possible fault in token_id")
-   
-    r = requests.delete(public_url+'/servers/'+ID, headers=headers)
-    return r
-    logger.info("Completed!")
-
-# To be fixed with DELETE
-@route('/method/releaseResources/', method='POST')
-@route('/method/releaseResources', method='POST')
-def releaseResources():
-    logger.info("Called")
-    headers = {'X-Auth-Token': token_id}
-    try:
-    	req = json.load(request.body)
-    except ValueError:
-    	print "N-Irm [releaseResources] Attempting to load a non-existent payload, please enter desired layout"
-    	print " "
-    	logger.error("Payload was empty or incorrect. A payload must be present and correct")
-    try:
-        try:
-    	    for ID in req['Reservations']:    	        
-                try:
-    	    	    #forces it to break is incorrect ID
-    	    	    info = getInstanceInfo(ID)
-    	            osstatus = info['server']['status']
-    	    	    #deletion of correct ID
-                    r = requests.delete(public_url+'/servers/'+ID, headers=headers)
-                except TypeError:
-                    print " "
-                    raise TypeError("N-Irm: [releaseResources] Payload present but fault in ID. Could be missing or incorrect.")
-                    logger.error("Payload was incorrect. ID possibly missing or incorrect")
-            # Thrown to enforce exception below
-            if ID in req['Reservations'] is None:            	
-                raise UnboundLocalError
-        except UnboundLocalError:
-            raise UnboundLocalError("N-Irm: [releaseResources] Payload may be missing. Or ID is missing or empty. Please check Payload!")
-            logger.error("Fault with payload and ID. If payload is present, Id may be missing or empty")
-
-            
-    #return r
-    except Exception.message, e:
-        response.status = 400
-        error = {"message":e,"code":response.status}
-        return error
-        logger.error(error)
-
-    logger.info("Completed!")
 
 @route('/method/calculateResourceCapacity/', method='POST')
 @route('/method/calculateResourceCapacity', method='POST')
@@ -811,6 +193,102 @@ def calculateResourceAgg():
         logger.error(error)
     logger.info("Completed!")
 
+
+################################################################### Reservation #######
+@route('/method/reserveResources/', method='POST')
+@route('/method/reserveResources', method='POST')
+def reserveResources():
+    logger.info("Called")
+    try:
+        global SHEPAPI 	
+        
+        if SHEPAPI == "":
+           raise Exception("No SHEPARD compute node has been registered!")
+           
+        obj = json.load(request.body)
+        headers = {'content-type': 'application/json'}
+        r = requests.post('http://'+SHEPAPI+'/method/reserveResources', headers=headers, data=json.dumps(obj))
+        ret = r.json()       
+        if ("error" in ret):
+          raise Exception(ret['error']['message'])
+        
+        resources = ret["result"]
+        
+        return rest_write(resources)
+    	             
+    except Exception, msg:
+        return rest_error(msg)
+    
+    logger.info("Completed")   
+    return result  
+    
+@route('/method/releaseResources/', method='POST')
+@route('/method/releaseResources', method='POST')
+def releaseResources():
+    logger.info("Called")
+    try:
+        global SHEPAPI 	
+        
+        if SHEPAPI == "":
+           raise Exception("No SHEPARD compute node has been registered!")
+           
+        obj = json.load(request.body)
+
+        headers = {'content-type': 'application/json'}
+        r = requests.post('http://'+SHEPAPI+'/method/releaseResources', headers=headers, data=json.dumps(obj))
+        ret = r.json()       
+        if ("error" in ret):
+          raise Exception(ret['error']['message'])
+        
+        resources = ret["result"]
+        
+        return rest_write(resources)
+    	             
+    except Exception, msg:
+        return rest_error(msg)
+    
+    logger.info("Completed")   
+    return result      
+    
+@route('/method/verifyResources/', method='POST')
+@route('/method/verifyResources', method='POST')
+def verifyResources():
+    logger.info("Called")
+    try:
+        global SHEPAPI 	
+        
+        if SHEPAPI == "":
+           raise Exception("No SHEPARD compute node has been registered!")
+           
+        obj = json.load(request.body)
+
+        headers = {'content-type': 'application/json'}
+        r = requests.post('http://'+SHEPAPI+'/method/verifyResources', headers=headers, data=json.dumps(obj))
+        ret = r.json()       
+        if ("error" in ret):
+          raise Exception(ret['error']['message'])
+        
+        resources = ret["result"]
+        
+        avail_res = resources["AvailableResources"]
+        
+        global cluster_info
+        
+        i = 0        
+        for r in avail_res:
+           r["ID"] = cluster_info["DFECluster"][i]["ID"] + r["ID"]        
+           r["Cost"] = cluster_info["DFECluster"][i]["Cost"]
+           i = i + 1
+                
+        return rest_write(resources)
+    	             
+    except Exception, msg:
+        return rest_error(msg)
+    
+    logger.info("Completed")   
+    return result  
+        
+      
 
 ################################################################### Discovery #########
 
