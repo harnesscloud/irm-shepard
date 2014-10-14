@@ -36,163 +36,33 @@ handler.setFormatter(formatter)
 
 logger.addHandler(handler)
 
-
-
+################################################################### Calculators #######
 @route('/method/calculateResourceCapacity/', method='POST')
 @route('/method/calculateResourceCapacity', method='POST')
 def calculateResourceCapacity():
     logger.info("Called")
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD')
-    try:          
-        # get the body request
-        try:
-            req = json.load(request.body)
-        except ValueError:
-       	    print "N-Irm: [calculateResourceCapacity] Attempting to load a non-existent payload, please enter desired layout"
-            print ""
-            logger.error("Payload was empty or incorrect. A payload must be present and correct")
-
-
-        # loop through all requested resources
-        try:
-            totCores = req['Resource']['Attributes']['Cores']
-        except KeyError:
-        	print "N-Irm [calculateResourceCapacity] 'Cores' cannot be found, please check spelling within payload"
-        	logger.error("Cores could not be found within [Resource][Attributes]- Possible speeling error within payload")
-        try:
-            totMem = req['Resource']['Attributes']['Memory']
-        except KeyError:
-        	print "N-Irm [calculateResourceCapacity] 'Memory' cannot be found, please check spelling within payload"
-          	logger.error("Memory could not be found within [Resource][Attributes]- Possible speeling error within payload")
-        try:
-            maxFreq = req['Resource']['Attributes']['Frequency']
-        except KeyError:
-            print "N-Irm [calculateResourceCapacity] 'Frequency' cannot be found, please check spelling within payload"
-            logger.error("Frequency could not be found within [Resource][Attributes]- Possible speeling error within payload")
-        try:
-           totDisk = req['Resource']['Attributes']['Disk']
-        except KeyError:
-        	print "N-Irm [calculateResourceCapacity] 'Disk' cannot be found, please check spelling within payload"
-        	logger.error("Disk could not be found within [Resource][Attributes]- Possible speeling error within payload")
-
-        for majorkey in req['Reserve']:
-           try: totCores = totCores - majorkey['Attributes']['Cores']
-           except KeyError: 
-              print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Reserve'" 
-              logger.error("totCores could not be assigned within 'Reserve'")
-              pass
-           try: totMem = totMem - majorkey['Attributes']['Memory']
-           except KeyError: 
-              print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Reserve'" 
-              logger.error("totMem could not be assigned within 'Reserve'")
-              pass
-           try: totDisk = totDisk - majorkey['Attributes']['Disk']
-           except KeyError: 
-              print "N-Irm [calculateResourceCapacity] failed to assign totDisk in 'Reserve'" 
-              logger.error("totDisk could not be assigned within 'Reserve'")
-              pass
-           #try: 
-           #    if maxFreq < majorkey['Attributes']['Frequency']:
-           #        maxFreq = majorkey['Attributes']['Frequency']
-           #except KeyError: pass
-        for majorkey in req['Release']:
-           try: totCores = totCores + majorkey['Attributes']['Cores']
-           except KeyError: 
-           	  print "N-Irm [calculateResourceCapacity] failed to assign totCores in 'Release'"
-           	  logger.error("totCores could not be assigned within 'Release'")
-           	  pass
-           try: totMem = totMem + majorkey['Attributes']['Memory']
-           except KeyError: 
-           	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'"
-           	  logger.error("totMem could not be assigned within 'Release'") 
-           	  pass
-           try: totDisk = totDisk + majorkey['Attributes']['Disk']
-           except KeyError: 
-           	  print "N-Irm [calculateResourceCapacity] failed to assign totMem in 'Release'" 
-           	  logger.error("totMem could not be assigned within 'Release'")
-           	  pass
-           #try:
-           #    if maxFreq < majorkey['Attributes']['Frequency']:
-           #        maxFreq = majorkey['Attributes']['Frequency']
-           #except KeyError: pass
-        try:
-            rType = req['Resource']['Type']
-        except AttributeError:
-        	print "Failed to assign Resource type to 'rtype'"
-        	logger.error("Unable to assign Resource type to 'rtype'")
-        #print totCores,maxFreq,totMem,totDisk
-
-        reply = {"Resource":{"Type":rType,"Attributes":{"Cores":totCores,"Frequency":maxFreq,"Memory":totMem,"Disk":totDisk}}}
-        result = {"result":reply}
-        jsondata = json.dumps(result)
-        return jsondata
-
-    except Exception.message, e:
-        response.status = 400
-        error = {"message":e,"code":response.status}
-        return error
-        logger.error(error)   
-    logger.info("Completed!")
-
-@route('/method/calculateResourceAgg/', method='POST')
-@route('/method/calculateResourceAgg', method='POST')
-def calculateResourceAgg():
-    response.set_header('Content-Type', 'application/json')
-    response.set_header('Accept', '*/*')
-    response.set_header('Allow', 'POST, HEAD')
-    logger.info("Called")
     try:
-        try:
-            # get the body request
-            req = json.load(request.body)
-        except ValueError: 
-        	print 'N-Irm: [calculateResourceAgg] Attempting to load a non-existent payload, please enter desired layout'
-        	print ' '
-        	logger.error("Payload was empty or incorrect. A payload must be present and correct")
-        # loop through all requested resources
-        totCores = 0
-        totMem = 0
-        maxFreq = 0
-        totDisk = 0
-        rType = req['Resources'][0]['Type']
-        #rType = 'machine' 
-
-        for majorkey in req['Resources']:
-           try: totCores = totCores + majorkey['Attributes']['Cores']
-           except KeyError:
-              print "N-Irm [calculateResourceAgg] failed to assign totCores in 'Resources'. Possible payload spelling error"
-              logger.error("Failure to assign totCores within 'Resources. Potential spelling error'") 
-              raise KeyError
-           try: totMem = totMem + majorkey['Attributes']['Memory']
-           except KeyError: 
-              print "N-Irm [calculateResourceAgg] failed to assign totMem in 'Resources'. Possible payload spelling error" 
-              logger.error("Failure to assign totMem within 'Resources. Potential spelling error'")               
-              raise KeyError
-           try: totDisk = totDisk + majorkey['Attributes']['Disk']
-           except KeyError: 
-              print "N-Irm [calculateResourceAgg] failed to assign totDisk in 'Resources'. Possible payload spelling error" 
-              logger.error("Failure to assign totDisk within 'Resources. Potential spelling error'")
-              raise KeyError
-           try:
-               if maxFreq < majorkey['Attributes']['Frequency']:
-                   maxFreq = majorkey['Attributes']['Frequency']
-           except KeyError: pass
-        #print totCores,maxFreq,totMem,totDisk
-
-        reply = {"Type":rType,"Attributes":{"Cores":totCores,"Frequency":maxFreq,"Memory":totMem,"Disk":totDisk}}
-        result = {"result":reply}
+        global SHEPAPI 	
         
-        jsondata = json.dumps(result)
-        return jsondata
-    except Exception.message, e:
-        response.status = 400
-        error = {"message":e,"code":response.status}
-        return error
-        logger.error(error)
-    logger.info("Completed!")
-
+        if SHEPAPI == "":
+           raise Exception("No SHEPARD compute node has been registered!")
+           
+        obj = json.load(request.body)
+        headers = {'content-type': 'application/json'}
+        r = requests.post('http://'+SHEPAPI+'/method/calculateResourceCapacity', headers=headers, data=json.dumps(obj))
+        ret = r.json()       
+        if ("error" in ret):
+          raise Exception(ret['error']['message'])
+        
+        resources = ret["result"]
+        
+        return rest_write(resources)
+    	             
+    except Exception, msg:
+        return rest_error(msg)
+    
+    logger.info("Completed")   
+    return result  
 
 ################################################################### Reservation #######
 @route('/method/reserveResources/', method='POST')
