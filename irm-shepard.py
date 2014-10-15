@@ -64,6 +64,32 @@ def calculateResourceCapacity():
     logger.info("Completed")   
     return result  
 
+@route('/method/calculateResourceAgg/', method='POST')
+@route('/method/calculateResourceAgg', method='POST')
+def calculateResourceCapacity():
+    logger.info("Called")
+    try:
+        global SHEPAPI 	
+        
+        if SHEPAPI == "":
+           raise Exception("No SHEPARD compute node has been registered!")
+           
+        obj = json.load(request.body)
+        headers = {'content-type': 'application/json'}
+        r = requests.post('http://'+SHEPAPI+'/method/calculateResourceAgg', headers=headers, data=json.dumps(obj))
+        ret = r.json()       
+        if ("error" in ret):
+          raise Exception(ret['error']['message'])
+        
+        resources = ret["result"]
+        
+        return rest_write(resources)
+    	             
+    except Exception, msg:
+        return rest_error(msg)
+    
+    logger.info("Completed")   
+    return result 
 ################################################################### Reservation #######
 @route('/method/reserveResources/', method='POST')
 @route('/method/reserveResources', method='POST')
