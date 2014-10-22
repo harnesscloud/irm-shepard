@@ -24,7 +24,7 @@ import ConfigParser
 from threading import Thread
 import logging
 import logging.handlers as handlers
-#from pudb import set_trace; set_trace()
+import socket, uuid
 
 #Config and format for logging messages
 logger = logging.getLogger("Rotating Log")
@@ -42,148 +42,260 @@ logger.addHandler(handler)
 def calculateResourceCapacity():
     logger.info("Called")
     try:
-        global SHEPAPI 	
+        obj = rest_read()
         
-        if SHEPAPI == "":
-           raise Exception("No SHEPARD compute node has been registered!")
-           
-        obj = json.load(request.body)
-        headers = {'content-type': 'application/json'}
-        r = requests.post('http://'+SHEPAPI+'/method/calculateResourceCapacity', headers=headers, data=json.dumps(obj))
-        ret = r.json()       
-        if ("error" in ret):
-          raise Exception(ret['error']['message'])
+        # get base
+        base = obj["Resource"]
+        exceed_capacity = False
         
-        resources = ret["result"]
-        
-        return rest_write(resources)
-    	             
+        if base["Type"] == "DFECluster":
+		     # release
+		     release_qt = 0
+		     if "Release" in obj:
+		        release = obj["Release"]
+		        for r in release:
+		           attrib = r["Attributes"]
+		           if "Quantity" in attrib:
+		              release_qt = release_qt + int(r["Attributes"]["Quantity"])
+		                   
+		     # reserve
+		     reserve_qt = 0
+		     if "Reserve" in obj:
+		        reserve = obj["Reserve"]
+		        for r in reserve:
+		           attrib = r["Attributes"]
+		           if "Quantity" in attrib:
+		              reserve_qt = reserve_qt + int(r["Attributes"]["Quantity"])     
+		     
+		     if ("Quantity" in base["Attributes"]):      
+		        bqty = int(base["Attributes"]["Quantity"]) + release_qt - reserve_qt
+		        base["Attributes"]["Quantity"] = bqty
+		        exceed_capacity = (bqty < 0) 
+		     ret = obj["Resource"]
+        else:
+           ret = { }        
+        logger.info("Completed")    
+        if (exceed_capacity):
+           return rest_write({ })         
+        else:
+           return rest_write(base) 
     except Exception, msg:
         return rest_error(msg)
-    
-    logger.info("Completed")   
-    return result  
 
 @route('/method/calculateResourceAgg/', method='POST')
 @route('/method/calculateResourceAgg', method='POST')
 def calculateResourceCapacity():
     logger.info("Called")
     try:
-        global SHEPAPI 	
+        obj = rest_read()
         
-        if SHEPAPI == "":
-           raise Exception("No SHEPARD compute node has been registered!")
-           
-        obj = json.load(request.body)
-        headers = {'content-type': 'application/json'}
-        r = requests.post('http://'+SHEPAPI+'/method/calculateResourceAgg', headers=headers, data=json.dumps(obj))
-        ret = r.json()       
-        if ("error" in ret):
-          raise Exception(ret['error']['message'])
+        # get resourcs array
+        resources = obj["Resources"]
         
-        resources = ret["result"]
+        base = { }
+        qty = 0
+        for res in resources:
+           if res["Type"] == "DFECluster":
+             if base == { }:
+                base = res
+             if "Quantity" in res["Attributes"]:
+                qty = qty + int(res["Attributes"]["Quantity"])
         
-        return rest_write(resources)
+        if base == {}:
+           raise Exception("Invalid input!")
+        if ("Quantity" in base["Attributes"]):
+           base["Attributes"]["Quantity"] = qty
+       
+    
+        logger.info("Completed")                        
+        return rest_write(base)  
     	             
     except Exception, msg:
         return rest_error(msg)
-    
-    logger.info("Completed")   
-    return result 
+     
+
 ################################################################### Reservation #######
 @route('/method/reserveResources/', method='POST')
 @route('/method/reserveResources', method='POST')
 def reserveResources():
     logger.info("Called")
-    try:
-        global SHEPAPI 	
+    try:           
+        obj = rest_read()
+        uid = uuid.uuid4().hex[:12]
         
-        if SHEPAPI == "":
-           raise Exception("No SHEPARD compute node has been registered!")
+        reservID = "IRES-" + uid
+        orchID = "SHEP-" + uid
+        
+        requests = obj["Resources"]
+        topology = ""
+       
+        for req in requests:
+           if (req["Type"] == "DFECluster"):
+              attribs = req["Attributes"]
+              if ("Topology" not in attribs):
+                 attribs["Topology"] = "SINGLETON"
+              if ("Model" not in attribs):
+                 attribs["Model"] = "MAIA"
+              if (attribs["Topology"] == "GROUP"):
+                 term = "GROUP(" +  attribs["Model"] + ", " + str(attribs["Quantity"]) + ")"
+              elif (attribs["Topology"] == "MAXRING"):
+                 term = "ARRAY(" +  attribs["Model"] + ", " + str(attribs["Quantity"]) + ")"
+              elif (attribs["Topology"] == "SINGLETON"):
+                 term = attribs["Model"] + "*" + str(attribs["Quantity"])
+              else:
+              	  raise Exception("Invalid topology in request! => " + str(attribs))
+           if (topology == ""):           
+              topology = term
+           else:
+              topology = topology + ", " + term
            
-        obj = json.load(request.body)
-        headers = {'content-type': 'application/json'}
-        r = requests.post('http://'+SHEPAPI+'/method/reserveResources', headers=headers, data=json.dumps(obj))
-        ret = r.json()       
-        if ("error" in ret):
-          raise Exception(ret['error']['message'])
+        if (topology == ""):
+           raise Exception("Must specify topology for reservations!")
         
-        resources = ret["result"]
+        if (ORCH_REMOTE != ""):
+		     command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
+		                " -r "+ ORCH_IP + 
+		                " -c reserve" +
+		                " -i " + orchID + 
+		                " -t \\\"" + topology + "\\\"\"")
         
-        return rest_write(resources)
+        else:
+		     command = (ORCH_DIR + "/maxorch" + 
+		                " -r "+ ORCH_IP + 
+		                " -c reserve" +
+		                " -i " + orchID + 
+		                " -t \"" + topology + "\"")        
+        try:
+           orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
+        except subprocess.CalledProcessError as c:
+           orch_ret = c.output
+           pass
+
+        if (orch_ret[:7] != "success"):
+           raise Exception("cannot create reservation: " + orch_ret)
+        
+        # update reservations   
+        global RESERVATIONS
+        RESERVATIONS["Reservations"][reservID] = orchID
+                              
+        ret = { "Reservations": [ reservID ] }                
+        logger.info("Completed")           
+        return rest_write(ret) 
     	             
     except Exception, msg:
         return rest_error(msg)
-    
-    logger.info("Completed")   
-    return result  
+  
     
 @route('/method/releaseResources/', method='POST')
 @route('/method/releaseResources', method='POST')
 def releaseResources():
     logger.info("Called")
     try:
-        global SHEPAPI 	
-        
-        if SHEPAPI == "":
-           raise Exception("No SHEPARD compute node has been registered!")
-           
-        obj = json.load(request.body)
+        obj = rest_read()
+        reservations = obj["Reservations"]
 
-        headers = {'content-type': 'application/json'}
-        r = requests.post('http://'+SHEPAPI+'/method/releaseResources', headers=headers, data=json.dumps(obj))
-        ret = r.json()       
-        if ("error" in ret):
-          raise Exception(ret['error']['message'])
-        
-        resources = ret["result"]
-        
-        return rest_write(resources)
-    	             
+        global RESERVATIONS, ORCH_REMOTE
+        for resID in reservations:
+           orchID =  RESERVATIONS["Reservations"][resID]
+           if ORCH_REMOTE != "":
+				  command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
+				             " -r "+ ORCH_IP + 
+				             " -c unreserve" +
+				             " -i " + orchID + "\"")
+           else:
+				  command = (ORCH_DIR + "/maxorch" + 
+				             " -r "+ ORCH_IP + 
+				             " -c unreserve" +
+				             " -i " + orchID)        
+           try:
+              orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
+           except subprocess.CalledProcessError as c:
+		        orch_ret = c.output
+		        pass
+
+           if (orch_ret[:7] != "success"):
+              raise Exception("cannot remove reservation [" + orchID + "]: " + orch_ret)
+		        
+           RESERVATIONS["Reservations"].pop(resID)        
+      	             
+        logger.info("Completed")              
+        return rest_write({})  
+            	             
     except Exception, msg:
         return rest_error(msg)
     
-    logger.info("Completed")   
-    return result      
     
 @route('/method/verifyResources/', method='POST')
 @route('/method/verifyResources', method='POST')
 def verifyResources():
     logger.info("Called")
     try:
-        global SHEPAPI 	
+        obj = rest_read()
+        res_req = obj["Reservations"]
         
-        if SHEPAPI == "":
-           raise Exception("No SHEPARD compute node has been registered!")
-           
-        obj = json.load(request.body)
+        global RESERVATIONS, ORCH_IP
+        
+        ret = { "Reservations" : [ ], "AvailableResources": { } }
+        
+        regReservations = RESERVATIONS["Reservations"]
 
-        headers = {'content-type': 'application/json'}
-        r = requests.post('http://'+SHEPAPI+'/method/verifyResources', headers=headers, data=json.dumps(obj))
-        ret = r.json()       
-        if ("error" in ret):
-          raise Exception(ret['error']['message'])
+        for resID in res_req:
+           if resID not in regReservations:
+              raise Exception("Cannot verify reservation [" + resID + "]: does not exist!")
+             
+           status = { "ID" : resID, "Ready": True, "Address": "maxorch://" + ORCH_IP + "/" + regReservations[resID] }           
+           ret["Reservations"].append(status)
+           
+        avail = json.loads(getAvailableResources())
         
-        resources = ret["result"]
-        
-        avail_res = resources["AvailableResources"]
-        
-        global cluster_info
-        
+        print(avail)
+
+        ret["AvailableResources"] = avail["result"]["Resources"]
+   
+        avail_res = ret["AvailableResources"]        
+        global cluster_info        
         i = 0        
         for r in avail_res:
            r["ID"] = cluster_info["DFECluster"][i]["ID"] + r["ID"]        
            r["Cost"] = cluster_info["DFECluster"][i]["Cost"]
            i = i + 1
-                
-        return rest_write(resources)
+
+        logger.info("Completed")                   
+        return rest_write(ret)
     	             
     except Exception, msg:
         return rest_error(msg)
-    
-    logger.info("Completed")   
-    return result  
+
+@route('/method/releaseAllResources/', method='POST')
+@route('/method/releaseAllResources', method='POST')
+def releaseAllResources():
+    logger.info("Called")
+    try:
+        global ORCH_REMOTE, ORCH_IP
         
+        #maxtop -r 192.168.0.1 | grep SHEP | awk '{ print $1 }' | xargs -L 1 maxorch -c unreserve -r 192.168.0.1
+        
+        command = ""
+        if ORCH_REMOTE != "":
+           command = ORCH_REMOTE + " " 
+        
+        command = command + "\"" + ORCH_DIR + "/maxtop -r " + ORCH_IP + \
+                  "| grep SHEP | awk '{ print $1 }' | xargs -L 1 " + \
+                  ORCH_DIR + "/maxorch -c unreserve -r " + \
+                  ORCH_IP + " -i\""
+        try:
+           orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
+        except subprocess.CalledProcessError as c:
+	        orch_ret = c.output
+	        pass
+
+        RESERVATIONS["Reservations"] = { } 	             
+        logger.info("Completed")              
+        return rest_write({})  
+            	             
+    except Exception, msg:
+        return rest_error(msg)
+            
       
 
 ################################################################### Discovery #########
@@ -211,36 +323,44 @@ def getResourceTypes():
 @route('/method/getAvailableResources', method='POST')
 def getAvailableResources(): 
     logger.info("Called")
-    try:   
-        global SHEPAPI 	
+
+    try:    	
+        global ORCH_DIR, ORCH_MODEL, ORCH_REMOTE, DUMMY_RESOURCES
+
+        command = ORCH_REMOTE + " " + "python " + ORCH_DIR + "/maxorchfree.py " + ORCH_IP + " " + ORCH_MODEL
         
-        if SHEPAPI == "":
-           raise Exception("No SHEPARD compute node has been registered!")
-           
-        obj = { "IP": IP_ADDR, "PORT": PORT_ADDR }
-        headers = {'content-type': 'application/json'}
-        r = requests.post('http://'+SHEPAPI+'/method/getAvailableResources', headers=headers, data=json.dumps(obj))
-        ret = r.json()       
-        if ("error" in ret):
-          raise Exception(ret['error']['message'])
+        if DUMMY_RESOURCES == 0:
+           resources = subprocess.check_output(command,shell=True)
+           #resources = "8:8"
+           lst = resources.split(":")        
+           # the first element has all the DFEs available
+           numDFEs = int(lst[0])
+        else:
+           numDFEs = DUMMY_RESOURCES                    
         
-        resources = ret["result"]
-        
-        global cluster_info
-        
+        global IRM_ADDR, HOSTNAME
+        ret = { "Resources" : [ { "IP": IRM_ADDR, 
+                                  "ID": IRM_ADDR + "/DFECluster/" + HOSTNAME,
+                                  "Type": "DFECluster", 
+                                  "Attributes":
+                                      {
+                                         "Model":ORCH_MODEL,
+                                         "Quantity":numDFEs,
+                                      }
+                                } ] }                                
+       
+        global cluster_info        
         i = 0
-        for res in resources["Resources"]:
+        for res in ret["Resources"]:
            res["ID"] = cluster_info["DFECluster"][i]["ID"] + res["ID"]
            res["Cost"] = cluster_info["DFECluster"][i]["Cost"]
-           i = i + 1
-                   
-        return rest_write(resources)
-    	             
+           i = i + 1                                
+       
+        logger.info("Completed")   
+        return rest_write(ret)    	             
     except Exception, msg:
         return rest_error(msg)
     
-    logger.info("Completed")   
-    return result    
 
 
 ################################################################### INITIALISATION ####
@@ -269,49 +389,30 @@ def verify_keys(keys, obj):
          raise Exception("No '" + k + "' found in request!")
 ############################################################################	
 
-@route('/method/registerSHEPARD/', method='POST')
-@route('/method/registerSHEPARD', method='POST')
-def registerSHEPARD():
-    logger.info("Called")
-    try:
-       req = rest_read()
-       verify_keys(['IP', 'PORT'], req)
-          
-       addr = req['IP'] + ":" + req['PORT']
-       
-       log("Registered SHEPARD COMPUTE: " + addr)
-       global SHEPAPI
-       SHEPAPI = addr
-
-       rest_write({})
-          
-       return rest_write({})
-       
-    except Exception, msg:
-        return rest_error(msg)
-    logger.info("Completed!")
-    
-    
 def registerIRM():
     logger.info("Called")
-    CRS_URL = CONFIG.get('main', 'CRS_URL')
-    print "Registering with CRS...", CRS_URL
-#    print "ip:%s , port:%s, crs: %s" % (IP_ADDR, PORT_ADDR, )
-    headers = {'content-type': 'application/json'}
-    try:
-       data = json.dumps(\
-       {\
-       "Manager":"IRM",\
-       "Hostname":IP_ADDR,\
-       "Port":PORT_ADDR\
-       })
-    except AttributeError:
-    	logger.error("Failed to json.dumps into data")
-   
-    # add here a check if that flavor name exists already and in that case return the correspondent ID
-    # without trying to create a new one as it will fail
-    r = requests.post(CONFIG.get('main', 'CRS_URL')+'/method/addManager', data, headers=headers)
+    if CONFIG.has_option('main', 'CRS_URL'):
+       CRS_URL = CONFIG.get('main', 'CRS_URL')
+       print "Registering with CRS...", CRS_URL
 
+       headers = {'content-type': 'application/json'}
+       global IRM_ADDR, IRM_PORT
+       try:
+		    data = json.dumps(\
+		    {\
+		    "Manager":"IRM",\
+		    "Hostname":IRM_ADDR,\
+		    "Port":IRM_PORT\
+		    })
+       except AttributeError:
+		 	logger.error("Failed to json.dumps into data")
+		
+		 # add here a check if that flavor name exists already and in that case return the correspondent ID
+		 # without trying to create a new one as it will fail
+       r = requests.post(CONFIG.get('main', 'CRS_URL')+'/method/addManager', data, headers=headers)
+    else:
+    	log("skipping CRS!")
+    	
     logger.info("Completed!")
     
 def getifip(ifn):
@@ -323,21 +424,18 @@ Provided network interface returns IP adress to bind on
     return socket.inet_ntoa(fcntl.ioctl(sck.fileno(), 0x8915, struct.pack('256s', ifn[:15]))[20:24])
     #return '131.254.16.173'
     
-def startAPI(IP_ADDR,PORT_ADDR):
+def startAPI():
     # check if irm already running
     command = "ps -fe | grep irm-shepard.py | grep python | grep -v grep"
     proccount = subprocess.check_output(command,shell=True).count('\n')
     proc = subprocess.check_output(command,shell=True)
+    global IRM_ADDR, IRM_PORT 
     if proccount > 1:
         print "---Check if irm is already running. Connection error---"
         sys.exit(0)
     else:
-        #Thread(target=registerIRM).start()
-        
-        #registerIRM()
-        print "IRM API IP address:",IP_ADDR        
-        API_HOST=run(host=IP_ADDR, port=PORT_ADDR)
-    return IP_ADDR
+        Thread(target=registerIRM).start()       
+        run(host=IRM_ADDR, port=IRM_PORT)
 
 def loadClusterInfo():
      logger.info("Called")
@@ -364,27 +462,58 @@ def main():
     parser = optparse.OptionParser(usage=usage,epilog=epilog,description=description)
     
     parser.add_option('-v','--version', action='store_true', default=False,dest='version',help='show version information')
+    parser.add_option('-c','--crs', action='store_true', default=False,dest='crs',help='connect to CRS')
 
+    global options
     options, args = parser.parse_args()
-    #print options, args
+
     if options.version:
         VERSION = "0.1"
         print VERSION
         sys.exit(1)
     
-    try:
-       INTERFACE = CONFIG.get('main', 'IRM_IF')
-       global PORT_ADDR 
-       PORT_ADDR = CONFIG.get('main', 'IRM_PORT')
+    try:     
+       global IRM_ADDR       
+       if CONFIG.has_option('main', 'IRM_HOST'):
+          IRM_ADDR = CONFIG.get('main', 'IRM_HOST')
+       else:
+         IRM_ADDR = getifip(CONFIG.get('main', 'IRM_IF'))
+                 
+       global IRM_PORT 
+       IRM_PORT  = CONFIG.get('main', 'IRM_PORT')
+                     
+       global ORCH_DIR
+       ORCH_DIR = CONFIG.get('main', 'ORCH_DIR')
        
-       global SHEPAPI, cluster_info, IP_ADDR      
-
-       SHEPAPI=""
+       global ORCH_IP
+       ORCH_IP = CONFIG.get('main', 'ORCH_IP')
+       
+       global ORCH_MODEL
+       ORCH_MODEL = CONFIG.get('main', 'ORCH_MODEL')
+       
+       global ORCH_REMOTE
+       if (CONFIG.has_option('main', 'ORCH_REMOTE')):
+          ORCH_REMOTE = CONFIG.get('main', 'ORCH_REMOTE')
+       else:
+          ORCH_REMOTE = ''
+                   
        global cluster_info
        cluster_info = loadClusterInfo()
-       IP_ADDR=getifip(INTERFACE)
        
-       startAPI(IP_ADDR,PORT_ADDR)
+       global HOSTNAME
+       HOSTNAME=socket.gethostname()
+       
+       global RESERVATIONS
+       RESERVATIONS = {"Reservations": {}}  
+       
+       global DUMMY_RESOURCES
+       if (CONFIG.has_option('main', 'DUMMY_RESOURCES')):
+          DUMMY_RESOURCES = int(CONFIG.get('main', 'DUMMY_RESOURCES'))
+          print "[i] using dummy DFE resources ", DUMMY_RESOURCES
+       else:
+          DUMMY_RESOURCES = 0
+            
+       startAPI()
     except Exception, e:
        e = sys.exc_info()[1]
        print "Error",e
