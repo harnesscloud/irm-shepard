@@ -29,8 +29,9 @@ import socket, uuid
 #Config and format for logging messages
 logger = logging.getLogger("Rotating Log")
 logger.setLevel(logging.INFO)
-formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S %p')
+formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s: %(filename)s - %(funcName)s: %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 handler = handlers.TimedRotatingFileHandler("s-irm.log",when="H",interval=24,backupCount=0)
+
 ## Logging format
 handler.setFormatter(formatter)
 
@@ -402,7 +403,8 @@ def registerIRM():
 		    {\
 		    "Manager":"IRM",\
 		    "Hostname":IRM_ADDR,\
-		    "Port":IRM_PORT\
+		    "Port":IRM_PORT,\
+		    "Name":"IRM-SHEPARD"\
 		    })
        except AttributeError:
 		 	logger.error("Failed to json.dumps into data")
