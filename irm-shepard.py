@@ -155,14 +155,14 @@ def reserveResources():
         
         if (ORCH_REMOTE != ""):
 		     command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
-		                " -r "+ ORCH_IP + 
+		                " -r "+ ORCH_IP_IB + 
 		                " -c reserve" +
 		                " -i " + orchID + 
 		                " -t \\\"" + topology + "\\\"\"")
         
         else:
 		     command = (ORCH_DIR + "/maxorch" + 
-		                " -r "+ ORCH_IP + 
+		                " -r "+ ORCH_IP_IB + 
 		                " -c reserve" +
 		                " -i " + orchID + 
 		                " -t \"" + topology + "\"")        
@@ -195,17 +195,17 @@ def releaseResources():
         obj = rest_read()
         reservations = obj["Reservations"]
 
-        global RESERVATIONS, ORCH_REMOTE
+        global RESERVATIONS, ORCH_REMOTE, ORCH_IP_IB
         for resID in reservations:
            orchID =  RESERVATIONS["Reservations"][resID]
            if ORCH_REMOTE != "":
 				  command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
-				             " -r "+ ORCH_IP + 
+				             " -r "+ ORCH_IP_IB + 
 				             " -c unreserve" +
 				             " -i " + orchID + "\"")
            else:
 				  command = (ORCH_DIR + "/maxorch" + 
-				             " -r "+ ORCH_IP + 
+				             " -r "+ ORCH_IP_IB + 
 				             " -c unreserve" +
 				             " -i " + orchID)        
            try:
@@ -234,7 +234,7 @@ def verifyResources():
         obj = rest_read()
         res_req = obj["Reservations"]
         
-        global RESERVATIONS, ORCH_IP
+        global RESERVATIONS, ORCH_IP_IB
         
         ret = { "Reservations" : [ ], "AvailableResources": { } }
         
@@ -244,7 +244,7 @@ def verifyResources():
            if resID not in regReservations:
               raise Exception("Cannot verify reservation [" + resID + "]: does not exist!")
              
-           status = { "ID" : resID, "Ready": True, "Address": "maxorch://" + ORCH_IP + "/" + regReservations[resID] }           
+           status = { "ID" : resID, "Ready": True, "Address": "maxorch://" + ORCH_IP_IB + "/" + regReservations[resID] }           
            ret["Reservations"].append(status)
            
         avail = json.loads(getAvailableResources())
@@ -272,7 +272,7 @@ def verifyResources():
 def releaseAllResources():
     logger.info("Called")
     try:
-        global ORCH_REMOTE, ORCH_IP
+        global ORCH_REMOTE, ORCH_IP_IB
         
         #maxtop -r 192.168.0.1 | grep SHEP | awk '{ print $1 }' | xargs -L 1 maxorch -c unreserve -r 192.168.0.1
         
@@ -280,10 +280,10 @@ def releaseAllResources():
         if ORCH_REMOTE != "":
            command = ORCH_REMOTE + " " 
         
-        command = command + "\"" + ORCH_DIR + "/maxtop -r " + ORCH_IP + \
+        command = command + "\"" + ORCH_DIR + "/maxtop -r " + ORCH_IP_IB + \
                   "| grep SHEP | awk '{ print $1 }' | xargs -L 1 " + \
                   ORCH_DIR + "/maxorch -c unreserve -r " + \
-                  ORCH_IP + " -i\""
+                  ORCH_IP_IB + " -i\""
         try:
            orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
         except subprocess.CalledProcessError as c:
@@ -326,9 +326,9 @@ def getAvailableResources():
     logger.info("Called")
 
     try:    	
-        global ORCH_DIR, ORCH_MODEL, ORCH_REMOTE, DUMMY_RESOURCES
+        global ORCH_DIR, ORCH_MODEL, ORCH_REMOTE, DUMMY_RESOURCES, ORCH_IP, ORCH_HOST, ORCH_IP_IB
 
-        command = ORCH_REMOTE + " " + "python " + ORCH_DIR + "/maxorchfree.py " + ORCH_IP + " " + ORCH_MODEL
+        command = ORCH_REMOTE + " " + "python " + ORCH_DIR + "/maxorchfree.py " + ORCH_IP_IB + " " + ORCH_MODEL
         
         if DUMMY_RESOURCES == 0:
            resources = subprocess.check_output(command,shell=True)
@@ -338,10 +338,10 @@ def getAvailableResources():
            numDFEs = int(lst[0])
         else:
            numDFEs = DUMMY_RESOURCES                    
-        
+                
         global IRM_ADDR, HOSTNAME
-        ret = { "Resources" : [ { "IP": IRM_ADDR, 
-                                  "ID": IRM_ADDR + "/DFECluster/" + HOSTNAME,
+        ret = { "Resources" : [ { "IP": ORCH_IP, 
+                                  "ID": IRM_ADDR + "/DFECluster/" + ORCH_HOST,
                                   "Type": "DFECluster", 
                                   "Attributes":
                                       {
@@ -486,9 +486,15 @@ def main():
                      
        global ORCH_DIR
        ORCH_DIR = CONFIG.get('main', 'ORCH_DIR')
+             
+       global ORCH_IP_IB
+       ORCH_IP_IB = CONFIG.get('main', 'ORCH_IP_IB')
        
        global ORCH_IP
-       ORCH_IP = CONFIG.get('main', 'ORCH_IP')
+       ORCH_IP = CONFIG.get('main', 'ORCH_IP')       
+
+       global ORCH_HOST
+       ORCH_HOST = CONFIG.get('main', 'ORCH_HOST')       
        
        global ORCH_MODEL
        ORCH_MODEL = CONFIG.get('main', 'ORCH_MODEL')
@@ -504,6 +510,7 @@ def main():
        
        global HOSTNAME
        HOSTNAME=socket.gethostname()
+       
        
        global RESERVATIONS
        RESERVATIONS = {"Reservations": {}}  
