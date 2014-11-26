@@ -56,8 +56,8 @@ def calculateResourceCapacity():
 		        release = obj["Release"]
 		        for r in release:
 		           attrib = r["Attributes"]
-		           if "Quantity" in attrib:
-		              release_qt = release_qt + int(r["Attributes"]["Quantity"])
+		           if "Size" in attrib:
+		              release_qt = release_qt + int(r["Attributes"]["Size"])
 		                   
 		     # reserve
 		     reserve_qt = 0
@@ -65,12 +65,12 @@ def calculateResourceCapacity():
 		        reserve = obj["Reserve"]
 		        for r in reserve:
 		           attrib = r["Attributes"]
-		           if "Quantity" in attrib:
-		              reserve_qt = reserve_qt + int(r["Attributes"]["Quantity"])     
+		           if "Size" in attrib:
+		              reserve_qt = reserve_qt + int(r["Attributes"]["Size"])     
 		     
-		     if ("Quantity" in base["Attributes"]):      
-		        bqty = int(base["Attributes"]["Quantity"]) + release_qt - reserve_qt
-		        base["Attributes"]["Quantity"] = bqty
+		     if ("Size" in base["Attributes"]):      
+		        bqty = int(base["Attributes"]["Size"]) + release_qt - reserve_qt
+		        base["Attributes"]["Size"] = bqty
 		        exceed_capacity = (bqty < 0) 
 		     ret = obj["Resource"]
         else:
@@ -79,7 +79,7 @@ def calculateResourceCapacity():
         if (exceed_capacity):
            return rest_write({ })         
         else:
-           return rest_write(base) 
+           return rest_write({"Resource:":base}) 
     except Exception, msg:
         return rest_error(msg)
 
@@ -99,13 +99,13 @@ def calculateResourceCapacity():
            if res["Type"] == "DFECluster":
              if base == { }:
                 base = res
-             if "Quantity" in res["Attributes"]:
-                qty = qty + int(res["Attributes"]["Quantity"])
+             if "Size" in res["Attributes"]:
+                qty = qty + int(res["Attributes"]["Size"])
         
         if base == {}:
            raise Exception("Invalid input!")
-        if ("Quantity" in base["Attributes"]):
-           base["Attributes"]["Quantity"] = qty
+        if ("Size" in base["Attributes"]):
+           base["Attributes"]["Size"] = qty
        
     
         logger.info("Completed")                        
@@ -138,11 +138,11 @@ def reserveResources():
               if ("Model" not in attribs):
                  attribs["Model"] = "MAIA"
               if (attribs["Topology"] == "GROUP"):
-                 term = "GROUP(" +  attribs["Model"] + ", " + str(attribs["Quantity"]) + ")"
+                 term = "GROUP(" +  attribs["Model"] + ", " + str(attribs["Size"]) + ")"
               elif (attribs["Topology"] == "MAXRING"):
-                 term = "ARRAY(" +  attribs["Model"] + ", " + str(attribs["Quantity"]) + ")"
+                 term = "ARRAY(" +  attribs["Model"] + ", " + str(attribs["Size"]) + ")"
               elif (attribs["Topology"] == "SINGLETON"):
-                 term = attribs["Model"] + "*" + str(attribs["Quantity"])
+                 term = attribs["Model"] + "*" + str(attribs["Size"])
               else:
               	  raise Exception("Invalid topology in request! => " + str(attribs))
            if (topology == ""):           
@@ -308,7 +308,7 @@ def getResourceTypes():
     logger.info("Called")
     try:
         types = {"Types":[]}
-        data = {"Type":"DFECluster","Attributes":{"Model":{"Description":"model","DataType":"string"},"Quantity":{"Description":"number of units","DataType":"int"},"Topology":{"Description":"Group or Array","DataType":"string"}}}
+        data = {"Type":"DFECluster","Attributes":{"Model":{"Description":"model","DataType":"string"},"Size":{"Description":"number of units","DataType":"int"},"Topology":{"Description":"Group or Array","DataType":"string"}}}
         types["Types"].append(data)
                
         return rest_write(types)
@@ -346,7 +346,7 @@ def getAvailableResources():
                                   "Attributes":
                                       {
                                          "Model":ORCH_MODEL,
-                                         "Quantity":numDFEs,
+                                         "Size":numDFEs,
                                       }
                                 } ] }                                
        
