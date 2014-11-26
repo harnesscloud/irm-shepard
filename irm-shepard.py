@@ -79,7 +79,7 @@ def calculateResourceCapacity():
         if (exceed_capacity):
            return rest_write({ })         
         else:
-           return rest_write({"Resource:":base}) 
+           return rest_write({"Resource":base}) 
     except Exception, msg:
         return rest_error(msg)
 
