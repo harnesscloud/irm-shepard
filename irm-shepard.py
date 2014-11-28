@@ -244,7 +244,7 @@ def verifyResources():
            if resID not in regReservations:
               raise Exception("Cannot verify reservation [" + resID + "]: does not exist!")
              
-           status = { "ID" : resID, "Ready": True, "Address": "maxorch://" + ORCH_IP_IB + "/" + regReservations[resID] }           
+           status = { "ID" : resID, "Ready": True, "Address":  regReservations[resID] + "^" + ORCH_IP_IB }           
            ret["Reservations"].append(status)
            
         avail = json.loads(getAvailableResources())
