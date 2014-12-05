@@ -130,6 +130,7 @@ def reserveResources():
         requests = obj["Resources"]
         topology = ""
        
+        total_size = 0
         for req in requests:
            if (req["Type"] == "DFECluster"):
               attribs = req["Attributes"]
@@ -143,6 +144,7 @@ def reserveResources():
                  term = "ARRAY(" +  attribs["Model"] + ", " + str(attribs["Size"]) + ")"
               elif (attribs["Topology"] == "SINGLETON"):
                  term = attribs["Model"] + "*" + str(attribs["Size"])
+                 total_size = total_size + int(attribs["Size"])
               else:
               	  raise Exception("Invalid topology in request! => " + str(attribs))
            if (topology == ""):           
@@ -153,31 +155,36 @@ def reserveResources():
         if (topology == ""):
            raise Exception("Must specify topology for reservations!")
         
-        if (ORCH_REMOTE != ""):
+        if (ORCH_MODEL != "DUMMY"):
+           if (ORCH_REMOTE != ""):
 		     command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
 		                " -r "+ ORCH_IP_IB + 
 		                " -c reserve" +
 		                " -i " + orchID + 
 		                " -t \\\"" + topology + "\\\"\"")
         
-        else:
+           else:
 		     command = (ORCH_DIR + "/maxorch" + 
 		                " -r "+ ORCH_IP_IB + 
 		                " -c reserve" +
 		                " -i " + orchID + 
 		                " -t \"" + topology + "\"")        
-        try:
-           orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
-        except subprocess.CalledProcessError as c:
-           orch_ret = c.output
-           pass
+           try:
+              orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
+           except subprocess.CalledProcessError as c:
+              orch_ret = c.output
+              pass
 
-        if (orch_ret[:7] != "success"):
-           raise Exception("cannot create reservation: " + orch_ret)
-        
+           if (orch_ret[:7] != "success"):
+              raise Exception("cannot create reservation: " + orch_ret)
+        else:
+           global DUMMY_CURRENT_RESOURCES
+           if DUMMY_CURRENT_RESOURCES - total_size < 0:
+              raise Exception("cannot create reservation: Insufficient resources")
+           DUMMY_CURRENT_RESOURCES = DUMMY_CURRENT_RESOURCES - total_size
         # update reservations   
         global RESERVATIONS
-        RESERVATIONS["Reservations"][reservID] = orchID
+        RESERVATIONS["Reservations"][reservID] = { "id": orchID, "size": total_size }
                               
         ret = { "Reservations": [ reservID ] }                
         logger.info("Completed")           
@@ -195,28 +202,32 @@ def releaseResources():
         obj = rest_read()
         reservations = obj["Reservations"]
 
-        global RESERVATIONS, ORCH_REMOTE, ORCH_IP_IB
+        global RESERVATIONS, ORCH_REMOTE, ORCH_IP_IB, ORCH_MODEL
         for resID in reservations:
-           orchID =  RESERVATIONS["Reservations"][resID]
-           if ORCH_REMOTE != "":
+           orchID =  RESERVATIONS["Reservations"][resID]["id"]
+           resSize = RESERVATIONS["Reservations"][resID]["size"]
+           if ORCH_MODEL != "DUMMY":
+              if ORCH_REMOTE != "":
 				  command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
 				             " -r "+ ORCH_IP_IB + 
 				             " -c unreserve" +
 				             " -i " + orchID + "\"")
-           else:
+              else:
 				  command = (ORCH_DIR + "/maxorch" + 
 				             " -r "+ ORCH_IP_IB + 
 				             " -c unreserve" +
 				             " -i " + orchID)        
-           try:
-              orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
-           except subprocess.CalledProcessError as c:
+              try:
+                 orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
+              except subprocess.CalledProcessError as c:
 		        orch_ret = c.output
 		        pass
 
-           if (orch_ret[:7] != "success"):
-              raise Exception("cannot remove reservation [" + orchID + "]: " + orch_ret)
-		        
+              if (orch_ret[:7] != "success"):
+                 raise Exception("cannot remove reservation [" + orchID + "]: " + orch_ret)
+	   else:
+              global DUMMY_CURRENT_RESOURCES
+              DUMMY_CURRENT_RESOURCES = DUMMY_CURRENT_RESOURCES + resSize              	        
            RESERVATIONS["Reservations"].pop(resID)        
       	             
         logger.info("Completed")              
@@ -244,7 +255,7 @@ def verifyResources():
            if resID not in regReservations:
               raise Exception("Cannot verify reservation [" + resID + "]: does not exist!")
              
-           status = { "ID" : resID, "Ready": True, "Address":  regReservations[resID] + "^" + ORCH_IP_IB }           
+           status = { "ID" : resID, "Ready": True, "Address":  regReservations[resID]["id"] + "^" + ORCH_IP_IB }           
            ret["Reservations"].append(status)
            
         avail = json.loads(getAvailableResources())
@@ -272,23 +283,25 @@ def verifyResources():
 def releaseAllResources():
     logger.info("Called")
     try:
-        global ORCH_REMOTE, ORCH_IP_IB
+        global ORCH_MODEL, ORCH_REMOTE, ORCH_IP_IB
         
-        #maxtop -r 192.168.0.1 | grep SHEP | awk '{ print $1 }' | xargs -L 1 maxorch -c unreserve -r 192.168.0.1
-        
-        command = ""
-        if ORCH_REMOTE != "":
-           command = ORCH_REMOTE + " " 
-        
-        command = command + "\"" + ORCH_DIR + "/maxtop -r " + ORCH_IP_IB + \
+        if ORCH_MODEL == "DUMMY":
+           global DUMMY_RESOURCES, DUMMY_CURRENT_RESOURCES                    
+           DUMMY_CURRENT_RESOURCES = DUMMY_RESOURCES
+        else:
+           #maxtop -r 192.168.0.1 | grep SHEP | awk '{ print $1 }' | xargs -L 1 maxorch -c unreserve -r 192.168.0.1
+           command = ""
+           if ORCH_REMOTE != "":
+              command = ORCH_REMOTE + " " 
+           command = command + "\"" + ORCH_DIR + "/maxtop -r " + ORCH_IP_IB + \
                   "| grep SHEP | awk '{ print $1 }' | xargs -L 1 " + \
                   ORCH_DIR + "/maxorch -c unreserve -r " + \
                   ORCH_IP_IB + " -i\""
-        try:
-           orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
-        except subprocess.CalledProcessError as c:
-	        orch_ret = c.output
-	        pass
+           try:
+              orch_ret = subprocess.check_output(command,stderr=subprocess.STDOUT, shell=True)
+           except subprocess.CalledProcessError as c:
+	      orch_ret = c.output
+	      pass
 
         RESERVATIONS["Reservations"] = { } 	             
         logger.info("Completed")              
@@ -296,8 +309,6 @@ def releaseAllResources():
             	             
     except Exception, msg:
         return rest_error(msg)
-            
-      
 
 ################################################################### Discovery #########
 
@@ -326,18 +337,17 @@ def getAvailableResources():
     logger.info("Called")
 
     try:    	
-        global ORCH_DIR, ORCH_MODEL, ORCH_REMOTE, DUMMY_RESOURCES, ORCH_IP, ORCH_HOST, ORCH_IP_IB
+        global ORCH_DIR, ORCH_MODEL, ORCH_REMOTE, DUMMY_CURRENT_RESOURCES, ORCH_IP, ORCH_HOST, ORCH_IP_IB
 
-        command = ORCH_REMOTE + " " + "python " + ORCH_DIR + "/maxorchfree.py " + ORCH_IP_IB + " " + ORCH_MODEL
-        
-        if DUMMY_RESOURCES == 0:
+        if ORCH_MODEL != "DUMMY":
+           command = ORCH_REMOTE + " " + "python " + ORCH_DIR + "/maxorchfree.py " + ORCH_IP_IB + " " + ORCH_MODEL
            resources = subprocess.check_output(command,shell=True)
            #resources = "8:8"
            lst = resources.split(":")        
            # the first element has all the DFEs available
            numDFEs = int(lst[0])
         else:
-           numDFEs = DUMMY_RESOURCES                    
+           numDFEs = DUMMY_CURRENT_RESOURCES                    
                 
         global IRM_ADDR, HOSTNAME
         ret = { "Resources" : [ { "IP": ORCH_IP, 
@@ -511,16 +521,18 @@ def main():
        global HOSTNAME
        HOSTNAME=socket.gethostname()
        
-       
        global RESERVATIONS
        RESERVATIONS = {"Reservations": {}}  
        
-       global DUMMY_RESOURCES
-       if (CONFIG.has_option('main', 'DUMMY_RESOURCES')):
-          DUMMY_RESOURCES = int(CONFIG.get('main', 'DUMMY_RESOURCES'))
-          print "[i] using dummy DFE resources ", DUMMY_RESOURCES
-       else:
-          DUMMY_RESOURCES = 0
+       if ORCH_MODEL == "DUMMY":
+          global DUMMY_RESOURCES, DUMMY_CURRENT_RESOURCES
+          if (CONFIG.has_option('main', 'DUMMY_RESOURCES')):
+             DUMMY_RESOURCES = int(CONFIG.get('main', 'DUMMY_RESOURCES'))
+             print "[i] using dummy DFE resources ", DUMMY_RESOURCES
+          else:
+             DUMMY_RESOURCES = 0
+
+          DUMMY_CURRENT_RESOURCES = DUMMY_RESOURCES
             
        startAPI()
     except Exception, e:
