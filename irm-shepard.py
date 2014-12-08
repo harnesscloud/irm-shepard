@@ -155,7 +155,8 @@ def reserveResources():
         if (topology == ""):
            raise Exception("Must specify topology for reservations!")
         
-        if (ORCH_MODEL != "DUMMY"):
+        global USE_ORCH
+        if USE_ORCH:
            if (ORCH_REMOTE != ""):
 		     command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
 		                " -r "+ ORCH_IP_IB + 
@@ -202,11 +203,11 @@ def releaseResources():
         obj = rest_read()
         reservations = obj["Reservations"]
 
-        global RESERVATIONS, ORCH_REMOTE, ORCH_IP_IB, ORCH_MODEL
+        global RESERVATIONS, ORCH_REMOTE, ORCH_IP_IB, ORCH_MODEL, USE_ORCH
         for resID in reservations:
            orchID =  RESERVATIONS["Reservations"][resID]["id"]
            resSize = RESERVATIONS["Reservations"][resID]["size"]
-           if ORCH_MODEL != "DUMMY":
+           if USE_ORCH:
               if ORCH_REMOTE != "":
 				  command = (ORCH_REMOTE + " \"" + ORCH_DIR + "/maxorch" + 
 				             " -r "+ ORCH_IP_IB + 
@@ -250,12 +251,16 @@ def verifyResources():
         ret = { "Reservations" : [ ], "AvailableResources": { } }
         
         regReservations = RESERVATIONS["Reservations"]
+        global USE_ORCH, DUMMY_IP_IB
 
         for resID in res_req:
            if resID not in regReservations:
               raise Exception("Cannot verify reservation [" + resID + "]: does not exist!")
-             
-           status = { "ID" : resID, "Ready": True, "Address":  regReservations[resID]["id"] + "^" + ORCH_IP_IB }           
+            
+           if not USE_ORCH:  
+               status = { "ID" : resID, "Ready": True, "Address":  DUMMY_IP_IB }           
+           else:
+               status = { "ID" : resID, "Ready": True, "Address":  regReservations[resID]["id"] + "^" + ORCH_IP_IB }           
            ret["Reservations"].append(status)
            
         avail = json.loads(getAvailableResources())
@@ -283,9 +288,9 @@ def verifyResources():
 def releaseAllResources():
     logger.info("Called")
     try:
-        global ORCH_MODEL, ORCH_REMOTE, ORCH_IP_IB
+        global ORCH_MODEL, ORCH_REMOTE, ORCH_IP_IB, USE_ORCH
         
-        if ORCH_MODEL == "DUMMY":
+        if not USE_ORCH:
            global DUMMY_RESOURCES, DUMMY_CURRENT_RESOURCES                    
            DUMMY_CURRENT_RESOURCES = DUMMY_RESOURCES
         else:
@@ -337,10 +342,11 @@ def getAvailableResources():
     logger.info("Called")
 
     try:    	
-        global ORCH_DIR, ORCH_MODEL, ORCH_REMOTE, DUMMY_CURRENT_RESOURCES, ORCH_IP, ORCH_HOST, ORCH_IP_IB
+        global USE_ORCH, ORCH_DIR, ORCH_MODEL, ORCH_REMOTE, DUMMY_CURRENT_RESOURCES, ORCH_IP, ORCH_HOST, ORCH_IP_IB, DUMMY_NAME
 
-        if ORCH_MODEL != "DUMMY":
+        if USE_ORCH:
            command = ORCH_REMOTE + " " + "python " + ORCH_DIR + "/maxorchfree.py " + ORCH_IP_IB + " " + ORCH_MODEL
+           print "command invoked", command
            resources = subprocess.check_output(command,shell=True)
            #resources = "8:8"
            lst = resources.split(":")        
@@ -524,15 +530,16 @@ def main():
        global RESERVATIONS
        RESERVATIONS = {"Reservations": {}}  
        
-       if ORCH_MODEL == "DUMMY":
-          global DUMMY_RESOURCES, DUMMY_CURRENT_RESOURCES
-          if (CONFIG.has_option('main', 'DUMMY_RESOURCES')):
-             DUMMY_RESOURCES = int(CONFIG.get('main', 'DUMMY_RESOURCES'))
-             print "[i] using dummy DFE resources ", DUMMY_RESOURCES
-          else:
-             DUMMY_RESOURCES = 0
-
+       global USE_ORCH
+       if CONFIG.has_option('main', 'DUMMY_RESOURCES'):
+          global DUMMY_RESOURCES, DUMMY_CURRENT_RESOURCES, DUMMY_IP_IB
+          DUMMY_RESOURCES = int(CONFIG.get('main', 'DUMMY_RESOURCES'))
+          print "[i] using dummy DFE resources ", DUMMY_RESOURCES
+          USE_ORCH=False
+          DUMMY_IP_IB=CONFIG.get('main', 'DUMMY_IP_IB')     
           DUMMY_CURRENT_RESOURCES = DUMMY_RESOURCES
+       else:
+          USE_ORCH=True
             
        startAPI()
     except Exception, e:
