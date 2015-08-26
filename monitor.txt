@@ -1,1 +1,0 @@
-ssh -t -t maia01 'n=0;while :; do X=`/opt/maxeler/maxeleros/utils/maxtop -r jma11^192.168.0.1|grep -G '[0-9]%'`; echo -e "BEGIN:$n:$(date +%s)\n$X\nEND";let "n+=1"; usleep 500000; done' | tee /tmp/bleh

@@ -43,7 +43,12 @@ class SHResourcesView(ResourcesView):
         return { "Types": {
                      "NumDFEs": { "Description": "Number of dataflow engines to allocate", "DataType": "int" },
                      "Topology": { "Description": "Supported topologies: SINGLETON, GROUP, RING", "DataType": "int" }
-                 }
+                 },
+                 "Monitor": {
+                    "DFE_UTILISATION": { "Description": "DFE utilisation (%)", "DataType": "float"},
+                    "DFE_TEMPERATURE": { "Description": "Temperature (C)", "DataType": "float"},
+                    "DFE_POWER":  { "Description": "Power (W)", "DataType": "float"}
+                 } 
                }
    
     def _calculate_capacity(self, resource, allocation, release):

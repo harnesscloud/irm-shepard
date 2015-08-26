@@ -8,11 +8,58 @@ from hresman.utils import json_request, json_reply, json_error
 from hresman.reservations_view import ReservationsView
 import uuid
 import json
-from hresman.utils import post
+from hresman.utils import post, delete_
 from shepard_resources_view import SHResourcesView
 import subprocess
+import copy
 
-
+def register_monitor(data, IP, IP_IB, rID):
+   try:
+      if 'DFECluster' not in data:
+         return
+      
+      req_metrics = copy.deepcopy(data['DFECluster'])
+      
+      for metric in req_metrics:
+         if metric == "DFE_UTILISATION":
+            req_metrics[metric]['command'] = "maxtop -r %s^%s -v | grep \"FPGA usage\"" \
+                                             " | gawk '{ sub(\"%%\", \"\", $3); sum += $3; n++ } END" \
+                                             " { if (n > 0) print sum /n;}'" % (rID, IP_IB)
+         elif metric == "DFE_POWER":
+            req_metrics[metric]['command'] = "maxtop -r %s^%s -v | grep \"Power usage\"" \
+                                             " | gawk '{ sum += $3; n++ } END" \
+                                             " { if (n > 0) print sum /n;  }'" % (rID, IP_IB)
+         elif metric == "DFE_TEMPERATURE":
+            req_metrics[metric]['command'] = "maxtop -r %s^%s -v | grep \"Temperature\"" \
+                                             " | gawk '{ sub(\"C\", \"\", $3); sum += $3; n++ } END" \
+                                             " { if (n > 0) print sum/n; } ' " \
+                                             % (rID, IP_IB)                                                                                       
+         elif metric != "PollTime":
+            pass # should probably give a warning  
+         req_metrics[metric]['type'] = "FLOAT"
+         if 'PollTimeMultiplier' not in req_metrics[metric]: 
+            req_metrics[metric]['PollTimeMultiplier'] = 1
+                
+      if "PollTime" in req_metrics:
+         polltime = req_metrics['PollTime']
+         del req_metrics['PollTime']
+      else:
+         polltime = 1000
+         
+      ret=post({"metrics": req_metrics, "instanceType": "generic", "PollTime": polltime, "uuid": rID},
+           "createAgent", 12000, IP)
+   except Exception as e:
+      print "[!] Monitoring agent not set up correctly!"
+      pass
+        
+def unregister_monitor(IP, rID):
+    try:
+       ret= delete_({ "uuid": rID }, "terminateAgent", 12000, IP)
+    except Exception as e:
+      print "[!] Monitoring agent not set up correctly!"
+      pass       
+    #   {u'Message': u'Terminated', u'Agent': u'SHEP-a5a31585c8b9'}
+    
 class SHReservationsView(ReservationsView):
     DUMMY_DFES_AVAILABLE = 0
     ###############################################  create reservation ############ 
@@ -60,10 +107,6 @@ class SHReservationsView(ReservationsView):
            else:
               topology_spec += ", " + term           
   
-        print "::::>", topology_spec
-        print dfes_allocated
-        
-        
         if cfg['USE_ORCH']:
            if cfg['ORCH_REMOTE'] != "":
               command = '%s "%s/maxorch -r %s -c reserve -i %s -t \\"%s\\""' % \
@@ -90,7 +133,10 @@ class SHReservationsView(ReservationsView):
            SHReservationsView.DUMMY_DFES_AVAILABLE -= dfes_allocated            
            
         ReservationsView.reservations[rID] = {"size": dfes_allocated, "topology": topology_spec }
-        
+        if monitor != {}:
+           register_monitor(monitor, cfg['ORCH_IP'], cfg['ORCH_IP_IB'], rID)
+              
+        print "Monitor:", monitor
         print ReservationsView.reservations
         return { "ReservationID" : [rID] }          
            
@@ -111,6 +157,7 @@ class SHReservationsView(ReservationsView):
     def _release_reservation(self, reservations):
        cfg = self.config
        for resID in reservations:
+          unregister_monitor(cfg['ORCH_IP'], resID)
           if resID not in ReservationsView.reservations: 
              raise Exception("cannot find reservation: " + resID)
 
@@ -144,6 +191,12 @@ class SHReservationsView(ReservationsView):
     ###############################################  release all reservations ############        
     def _release_all_reservations(self):
        cfg = self.config
+       try:
+          ret= delete_({}, "terminateAllAgents", 12000, cfg['ORCH_IP'])
+       except Exception as e:
+          print "[!] Monitoring agent not set up correctly!"
+          pass              
+             
        if cfg['USE_ORCH']:
           if cfg['ORCH_REMOTE'] != "":
               command = "%s \"%s/maxtop -r %s | grep SHEP | awk '{ print $1 }' | xargs -L 1 " \

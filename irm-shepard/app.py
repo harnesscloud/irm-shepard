@@ -12,11 +12,12 @@ import ConfigParser
 
 from shepard_resources_view import SHResourcesView
 from shepard_reservations_view import SHReservationsView
-  
+from shepard_metrics_view import SHMetricsView  
 
 sh_views = [
             SHResourcesView,
-            SHReservationsView
+            SHReservationsView,
+            SHMetricsView
            ]        
 mgr = HarnessResourceManager(sh_views)
 
