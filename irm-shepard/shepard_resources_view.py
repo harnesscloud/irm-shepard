@@ -42,12 +42,14 @@ class SHResourcesView(ResourcesView):
     def _get_alloc_spec(self):
         return { "Types": {
                      "NumDFEs": { "Description": "Number of dataflow engines to allocate", "DataType": "int" },
-                     "Topology": { "Description": "Supported topologies: SINGLETON, GROUP, RING", "DataType": "int" }
+                     "Topology": { "Description": "Supported topologies: SINGLETON, GROUP, RING", "DataType": "string" }
                  },
                  "Monitor": {
-                    "DFE_UTILISATION": { "Description": "DFE utilisation (%)", "DataType": "float"},
-                    "DFE_TEMPERATURE": { "Description": "Temperature (C)", "DataType": "float"},
-                    "DFE_POWER":  { "Description": "Power (W)", "DataType": "float"}
+                    "Metrics": {
+                       "DFE_UTILISATION": { "Description": "DFE utilisation (%)", "DataType": "float"},
+                       "DFE_TEMPERATURE": { "Description": "Temperature (C)", "DataType": "float"},
+                       "DFE_POWER":  { "Description": "Power (W)", "DataType": "float"}
+                    }
                  } 
                }
    
